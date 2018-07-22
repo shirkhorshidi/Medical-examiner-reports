@@ -1,0 +1,142 @@
+---
+title: "Medical examiner reports. Cook County, Illinois"
+output: html_notebook
+---
+
+Setting working directory
+```{r}
+library(dplyr)
+setwd("c:/Users/Ali/Desktop/Medical Examiner/")
+```
+
+
+read the dataset
+```{r}
+medical_examiner <- read.csv("Medical_Examiner_Case_Archive.csv",encoding = "UTF-8")
+medical_examiner
+```
+
+Selecting those varibles that are needed
+```{r}
+medical_examiner_selected <- medical_examiner %>% select(Case.Number,Date.of.Incident,Date.of.Death,Age,Gender,Race,Latino,Manner.of.Death,Primary.Cause,Incident.Address,Incident.City,longitude,latitude,OBJECTID)
+medical_examiner_selected
+```
+
+Select only completed cases
+```{r}
+medical_examiner_selected_complete <- medical_examiner_selected[medical_examiner_selected %>% complete.cases(),]
+medical_examiner_selected_complete
+```
+
+Cleaning data from outliers, any latitude and longitude > 3*standard deviation 
+```{r}
+#cleaning data from outliers, any latitude and longitude > 3*standard deviation 
+medical_examiner_selected_complete_rmoutlier <- medical_examiner_selected_complete %>% filter(longitude>mean(longitude)-3*sd(longitude) & latitude>mean(latitude)-3*sd(latitude) & longitude<mean(longitude)+3*sd(longitude) & latitude < mean(latitude)+3*(latitude))
+medical_examiner_selected_complete_rmoutlier
+
+```
+
+
+
+Creating countour plot for Accident deaths
+```{r}
+
+library("leaflet")
+library("data.table")
+library("sp")
+library("rgdal")
+# library("maptools")
+library("KernSmooth")
+
+
+plotdata <- medical_examiner_selected_complete_rmoutlier %>% filter(Manner.of.Death=='NATURAL')
+
+
+kde <- bkde2D(cbind(plotdata$longitude,plotdata$latitude),bandwidth=c(0.002,0.002),gridsize = c(20,20))
+CL <- contourLines(kde$x1 , kde$x2 , kde$fhat)
+
+## EXTRACT CONTOUR LINE LEVELS
+LEVS <- as.factor(sapply(CL, `[[`, "level"))
+NLEV <- length(levels(LEVS))
+
+## CONVERT CONTOUR LINES TO POLYGONS
+pgons <- lapply(1:length(CL), function(i)
+    Polygons(list(Polygon(cbind(CL[[i]]$x, CL[[i]]$y))), ID=i))
+spgons = SpatialPolygons(pgons)
+
+## Leaflet map with polygons
+leaflet(spgons) %>% addTiles() %>% 
+    addPolygons(color = heat.colors(NLEV, NULL)[LEVS])
+```
+
+
+```{r}
+## Leaflet map with points and polygons
+## Note, this shows some problems with the KDE, in my opinion...
+## For example there seems to be a hot spot at the intersection of Mayfield and
+## Fillmore, but it's not getting picked up.  Maybe a smaller bw is a good idea?
+
+leaflet(spgons) %>% addTiles() %>%
+    addPolygons(color = heat.colors(NLEV, NULL)[LEVS]) %>%
+    addCircles(lng = plotdata$longitude, lat = plotdata$latitude,
+               radius = .5, opacity = .2, col = "blue")
+```
+
+
+
+
+
+Creating countour plot for homicide deaths
+```{r}
+
+plotdata <- medical_examiner_selected_complete_rmoutlier %>% filter(Manner.of.Death=='HOMICIDE')
+
+
+kde <- bkde2D(cbind(plotdata$longitude,plotdata$latitude),bandwidth=c(0.002,0.002),gridsize = c(20,20))
+CL <- contourLines(kde$x1 , kde$x2 , kde$fhat)
+
+## EXTRACT CONTOUR LINE LEVELS
+LEVS <- as.factor(sapply(CL, `[[`, "level"))
+NLEV <- length(levels(LEVS))
+
+## CONVERT CONTOUR LINES TO POLYGONS
+pgons <- lapply(1:length(CL), function(i)
+    Polygons(list(Polygon(cbind(CL[[i]]$x, CL[[i]]$y))), ID=i))
+spgons = SpatialPolygons(pgons)
+
+## Leaflet map with polygons
+leaflet(spgons) %>% addTiles() %>% 
+    addPolygons(color = heat.colors(NLEV, NULL)[LEVS])
+
+```
+
+Creating countour plot for deaths by suicide 
+```{r}
+library(leaflet)
+
+plotdata <- medical_examiner_selected_complete_rmoutlier %>% filter(Manner.of.Death=='SUICIDE')
+
+
+kde <- bkde2D(cbind(plotdata$longitude,plotdata$latitude),bandwidth=c(0.002,0.002),gridsize = c(20,20))
+CL <- contourLines(kde$x1 , kde$x2 , kde$fhat)
+
+## EXTRACT CONTOUR LINE LEVELS
+LEVS <- as.factor(sapply(CL, `[[`, "level"))
+NLEV <- length(levels(LEVS))
+
+## CONVERT CONTOUR LINES TO POLYGONS
+pgons <- lapply(1:length(CL), function(i)
+    Polygons(list(Polygon(cbind(CL[[i]]$x, CL[[i]]$y))), ID=i))
+spgons = SpatialPolygons(pgons)
+
+## Leaflet map with polygons
+leaflet(spgons) %>% addTiles() %>% 
+    addPolygons(color = heat.colors(NLEV, NULL)[LEVS])
+
+```
+
+
+
+
+
+
